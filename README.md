@@ -1,70 +1,59 @@
-# Getting Started with Create React App
+# YouTubeチャンネル分析ツール
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+## 概要
 
-## Available Scripts
+このアプリケーションは、YouTubeで直近3ヶ月に開設されたチャンネルの中から、特定の条件に合致するものを検索し、分析するためのWebアプリケーションです。
 
-In the project directory, you can run:
+新しいトレンドや、急成長しているチャンネルを発見する手助けとなります。
 
-### `npm start`
+## 主な機能
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+- **キーワード検索**: 指定したキーワード（最大5つ）に関連するチャンネルを検索します。
+- **フィルタリング**: 最低登録者数と最低総再生回数で、検索結果を絞り込むことができます。
+- **チャンネル情報表示**: 検索結果として、チャンネル名、サムネイル、登録者数、総再生回数、動画数、開設日などの情報を一覧で表示します。
+- **APIキーの保存**: YouTube Data API v3のキーをローカルストレージに保存し、再入力の手間を省きます。
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## 使い方
 
-### `npm test`
+1.  **APIキーの設定**:
+    -   [Google Cloud Console](https://console.cloud.google.com/apis/dashboard)でYouTube Data API v3を有効にし、APIキーを取得します。
+    -   取得したAPIキーを、アプリケーション上部の入力欄に入力し、「APIキーを保存」ボタンをクリックします。
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+2.  **検索条件の入力**:
+    -   検索したいキーワードを1つ以上入力します。
+    -   必要に応じて、最低登録者数と最低総再生回数を設定します。
 
-### `npm run build`
+3.  **検索の実行**:
+    -   「直近3ヶ月で人気の音楽チャンネルを検索」ボタンをクリックすると、検索が開始されます。
+    -   検索には最大で1〜2分程度かかる場合があります。
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+4.  **結果の確認**:
+    -   検索が完了すると、条件に合致したチャンネルの一覧が表示されます。
+    -   各チャンネルの詳細情報を確認したり、「YouTubeで見る」ボタンから直接チャンネルページにアクセスしたりできます。
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+## 技術スタック
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+-   React
+-   Bootstrap
+-   axios
 
-### `npm run eject`
+## セットアップ
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+このプロジェクトをローカル環境で実行する場合は、以下の手順に従ってください。
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+1.  **リポジトリのクローン**:
+    ```sh
+    git clone https://github.com/null256-2025/youtube-research.git
+    ```
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+2.  **依存関係のインストール**:
+    ```sh
+    npm install
+    ```
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+3.  **開発サーバーの起動**:
+    ```sh
+    npm start
+    ```
 
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+    ブラウザで `http://localhost:3000` を開くと、アプリケーションが表示されます。
