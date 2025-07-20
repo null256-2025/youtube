@@ -309,7 +309,7 @@ function App() {
 
   return (
     <div className="container mt-5">
-      <h1 className="mb-4 text-center">YouTubeチャンネル分析（タグベース）</h1>
+      <h1 className="mb-4 text-center">YouTubeチャンネル分析</h1>
       <p className="text-center text-muted">指定したキーワードがチャンネルのタグや動画のタグに含まれるチャンネルを分析します。</p>
 
       <div className="card mb-4">
