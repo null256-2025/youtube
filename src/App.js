@@ -10,6 +10,8 @@ function App() {
   const [minViewCount, setMinViewCount] = useState(10000);
   const [searchTerms, setSearchTerms] = useState(['']);
   const [logs, setLogs] = useState([]);
+  const [maxPagesPerTerm, setMaxPagesPerTerm] = useState(4); // ユーザーが選択可能な検索ページ数
+  const [channelAgeMonths, setChannelAgeMonths] = useState(3); // チャンネル開設期間（月）
 
   useEffect(() => {
     const storedApiKey = localStorage.getItem('youtube_api_key');
@@ -31,7 +33,7 @@ function App() {
   };
 
   const addSearchTerm = () => {
-    if (searchTerms.length < 5) {
+    if (searchTerms.length < 3) {
       setSearchTerms([...searchTerms, '']);
     }
   };
@@ -42,6 +44,86 @@ function App() {
       newSearchTerms.splice(index, 1);
       setSearchTerms(newSearchTerms);
     }
+  };
+
+  // チャンネルのキーワードを取得する関数
+  const getChannelKeywords = async (channelId) => {
+    try {
+      const response = await axios.get('https://www.googleapis.com/youtube/v3/channels', {
+        params: {
+          key: apiKey,
+          id: channelId,
+          part: 'brandingSettings',
+        },
+      });
+      
+      const keywords = response.data.items[0]?.brandingSettings?.channel?.keywords;
+      return keywords ? keywords.split(',').map(k => k.trim().toLowerCase()) : [];
+    } catch (error) {
+      console.error('Error fetching channel keywords:', error);
+      return [];
+    }
+  };
+
+  // チャンネルの動画のタグを取得する関数
+  const getChannelVideoTags = async (channelId) => {
+    try {
+      // チャンネルの最新動画を取得
+      const searchResponse = await axios.get('https://www.googleapis.com/youtube/v3/search', {
+        params: {
+          key: apiKey,
+          channelId: channelId,
+          type: 'video',
+          part: 'id',
+          maxResults: 10, // 最新10本の動画をチェック
+          order: 'date',
+        },
+      });
+
+      if (!searchResponse.data.items || searchResponse.data.items.length === 0) {
+        return [];
+      }
+
+      const videoIds = searchResponse.data.items.map(item => item.id.videoId).join(',');
+      
+      // 動画の詳細情報（タグ含む）を取得
+      const videosResponse = await axios.get('https://www.googleapis.com/youtube/v3/videos', {
+        params: {
+          key: apiKey,
+          id: videoIds,
+          part: 'snippet',
+        },
+      });
+
+      const allTags = [];
+      videosResponse.data.items.forEach(video => {
+        if (video.snippet.tags) {
+          allTags.push(...video.snippet.tags.map(tag => tag.toLowerCase()));
+        }
+      });
+
+      return [...new Set(allTags)]; // 重複を除去
+    } catch (error) {
+      console.error('Error fetching video tags:', error);
+      return [];
+    }
+  };
+
+  // キーワードがタグに含まれているかチェックする関数
+  const checkKeywordMatch = (keywords, tags, searchTerm) => {
+    const searchTermLower = searchTerm.toLowerCase();
+    
+    // チャンネルキーワードでのマッチ
+    const keywordMatch = keywords.some(keyword =>
+      keyword.includes(searchTermLower) || searchTermLower.includes(keyword)
+    );
+    
+    // 動画タグでのマッチ
+    const tagMatch = tags.some(tag =>
+      tag.includes(searchTermLower) || searchTermLower.includes(tag)
+    );
+    
+    return keywordMatch || tagMatch;
   };
 
   const searchChannels = async () => {
@@ -56,18 +138,18 @@ function App() {
         return;
     }
 
-    setMessage('検索中... (最大1〜2分程度かかる場合があります)');
+    setMessage('検索中... (タグ分析のため通常より時間がかかります)');
     setChannels([]);
     setLogs([]);
 
     try {
-      const threeMonthsAgo = new Date();
-      threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
-      const publishedAfter = threeMonthsAgo.toISOString();
+      const channelAgeDate = new Date();
+      channelAgeDate.setMonth(channelAgeDate.getMonth() - channelAgeMonths);
+      const publishedAfter = channelAgeDate.toISOString();
 
-      let allChannels = [];
-      const maxPagesPerTerm = 4; // 1ページ50件 x 4 = 200件/キーワード
+      let allChannelIds = new Set();
 
+      // 各検索キーワードで動画を検索し、チャンネルIDを収集
       for (const term of activeSearchTerms) {
         let nextPageToken = null;
         for (let page = 0; page < maxPagesPerTerm; page++) {
@@ -75,7 +157,7 @@ function App() {
             params: {
               key: apiKey,
               q: term,
-              type: 'channel',
+              type: 'video',
               part: 'snippet',
               maxResults: 50,
               publishedAfter: publishedAfter,
@@ -84,25 +166,28 @@ function App() {
           });
 
           if (searchResponse.data.items) {
-            allChannels = allChannels.concat(searchResponse.data.items);
+            searchResponse.data.items.forEach(item => {
+              if (item.snippet.channelId) {
+                allChannelIds.add(item.snippet.channelId);
+              }
+            });
           }
 
           nextPageToken = searchResponse.data.nextPageToken;
           if (!nextPageToken) {
-            break; // 次のページがなければ終了
+            break;
           }
         }
       }
 
-      const validChannelItems = allChannels.filter(item => item && item.id && item.id.channelId);
-      const channelIdSet = new Set(validChannelItems.map(item => item.id.channelId));
-      const uniqueChannelIds = [...channelIdSet];
+      const uniqueChannelIds = [...allChannelIds];
 
       if (uniqueChannelIds.length === 0) {
         setMessage('条件に合うチャンネルが見つかりませんでした。');
         return;
       }
 
+      // チャンネル情報を取得
       let fetchedChannels = [];
       const chunkSize = 50;
       for (let i = 0; i < uniqueChannelIds.length; i += chunkSize) {
@@ -115,50 +200,117 @@ function App() {
             part: 'snippet,statistics',
           },
         });
+        
         fetchedChannels = fetchedChannels.concat(channelsResponse.data.items);
       }
 
-      const mappedChannels = fetchedChannels.map(item => ({
-        id: item.id,
-        title: item.snippet.title,
-        description: item.snippet.description,
-        thumbnail: item.snippet.thumbnails.default.url,
-        subscriberCount: item.statistics.subscriberCount,
-        viewCount: item.statistics.viewCount,
-        videoCount: item.statistics.videoCount,
-        publishedAt: item.snippet.publishedAt,
-      }));
+      // 各チャンネルのタグ情報を取得し、キーワードマッチングを行う（リアルタイム表示）
+      let processedCount = 0;
+      const totalChannels = fetchedChannels.length;
 
-      const currentLogs = [];
-      const filteredChannels = mappedChannels.filter(channel => {
-        const meetsCriteria = parseInt(channel.subscriberCount) >= minSubscriberCount && parseInt(channel.viewCount) >= minViewCount;
-        currentLogs.push({ channel, meetsCriteria });
-        return meetsCriteria;
-      });
+      for (const channel of fetchedChannels) {
+        processedCount++;
+        setMessage(`分析中... (${processedCount}/${totalChannels})`);
 
-      setLogs(currentLogs);
-      filteredChannels.sort((a, b) => parseInt(b.viewCount) - parseInt(a.viewCount));
+        // 基本的な条件チェック
+        const meetsBasicCriteria = parseInt(channel.statistics.subscriberCount) >= minSubscriberCount &&
+                                   parseInt(channel.statistics.viewCount) >= minViewCount;
 
-      setChannels(filteredChannels);
-      if (filteredChannels.length === 0) {
-        setMessage('条件に合うチャンネルが見つかりませんでした。');
-      } else {
-        setMessage(`${filteredChannels.length}件のチャンネルが見つかりました。`);
+        if (meetsBasicCriteria) {
+          // チャンネルのキーワードと動画のタグを取得
+          const channelKeywords = await getChannelKeywords(channel.id);
+          const videoTags = await getChannelVideoTags(channel.id);
+
+          // 検索キーワードとのマッチングをチェック
+          const hasMatchingTags = activeSearchTerms.some(term =>
+            checkKeywordMatch(channelKeywords, videoTags, term)
+          );
+
+          const channelData = {
+            id: channel.id,
+            title: channel.snippet.title,
+            description: channel.snippet.description,
+            thumbnail: channel.snippet.thumbnails.default.url,
+            subscriberCount: channel.statistics.subscriberCount,
+            viewCount: channel.statistics.viewCount,
+            videoCount: channel.statistics.videoCount,
+            publishedAt: channel.snippet.publishedAt,
+            channelKeywords: channelKeywords,
+            videoTags: videoTags,
+            hasMatchingTags: hasMatchingTags,
+          };
+
+          // ログに即座に追加
+          setLogs(prevLogs => [...prevLogs, {
+            channel: channelData,
+            meetsCriteria: meetsBasicCriteria,
+            hasMatchingTags: hasMatchingTags
+          }]);
+
+          // マッチするチャンネルは結果に即座に追加
+          if (hasMatchingTags) {
+            setChannels(prevChannels => {
+              const newChannels = [...prevChannels, channelData];
+              // 再生回数順でソート
+              return newChannels.sort((a, b) => parseInt(b.viewCount) - parseInt(a.viewCount));
+            });
+          }
+        } else {
+          const channelData = {
+            id: channel.id,
+            title: channel.snippet.title,
+            description: channel.snippet.description,
+            thumbnail: channel.snippet.thumbnails.default.url,
+            subscriberCount: channel.statistics.subscriberCount,
+            viewCount: channel.statistics.viewCount,
+            videoCount: channel.statistics.videoCount,
+            publishedAt: channel.snippet.publishedAt,
+            channelKeywords: [],
+            videoTags: [],
+            hasMatchingTags: false,
+          };
+
+          // ログに即座に追加
+          setLogs(prevLogs => [...prevLogs, {
+            channel: channelData,
+            meetsCriteria: meetsBasicCriteria,
+            hasMatchingTags: false
+          }]);
+        }
       }
+
+      // 最終メッセージを設定
+      setTimeout(() => {
+        setChannels(prevChannels => {
+          if (prevChannels.length === 0) {
+            setMessage('指定したキーワードのタグを持つチャンネルが見つかりませんでした。');
+          } else {
+            setMessage(`分析完了！${prevChannels.length}件のマッチするチャンネルが見つかりました。`);
+          }
+          return prevChannels;
+        });
+      }, 100);
 
     } catch (error) {
       console.error('Error searching channels:', error);
       if (error.response) {
         console.error('Error response:', error.response.data);
+        
+        if (error.response.status === 403 && error.response.data.error?.errors?.[0]?.reason === 'quotaExceeded') {
+          setMessage('APIクォータ制限に達しました。Google Cloud ConsoleでAPIクォータを確認してください。');
+        } else {
+          setMessage('チャンネルの検索中にエラーが発生しました。APIキーが正しいか、またはリクエスト制限に達していないか確認してください。');
+        }
+      } else {
+        setMessage('ネットワークエラーが発生しました。インターネット接続を確認してください。');
       }
-      setMessage('チャンネルの検索中にエラーが発生しました。APIキーが正しいか、またはリクエスト制限に達していないか確認してください。');
     }
   };
 
   return (
     <div className="container mt-5">
-      <h1 className="mb-4 text-center">YouTube音楽チャンネル分析</h1>
-      <p className="text-center text-muted">直近3ヶ月に開設され、人気急上昇中の音楽チャンネルを発見します。</p>
+      <h1 className="mb-4 text-center">YouTubeチャンネル分析（タグベース）</h1>
+      <p className="text-center text-muted">指定したキーワードがチャンネルのタグや動画のタグに含まれるチャンネルを分析します。</p>
 
       <div className="card mb-4">
         <div className="card-header">
@@ -191,7 +343,7 @@ function App() {
           </div>
           <div className="card-body">
             <div className="mb-3">
-              <label className="form-label">検索キーワード (最大5つ)</label>
+              <label className="form-label">検索キーワード (最大3つ)</label>
               {searchTerms.map((term, index) => (
                 <div key={index} className="input-group mb-2">
                   <input
@@ -208,14 +360,30 @@ function App() {
                   )}
                 </div>
               ))}
-              {searchTerms.length < 5 && (
+              {searchTerms.length < 3 && (
                 <button className="btn btn-outline-secondary" type="button" onClick={addSearchTerm}>
                   キーワードを追加
                 </button>
               )}
             </div>
             <div className="row">
-              <div className="col-md-6 mb-3">
+              <div className="col-md-3 mb-3">
+                <label htmlFor="channelAgeMonths" className="form-label">チャンネル開設期間</label>
+                <select
+                  className="form-control"
+                  id="channelAgeMonths"
+                  value={channelAgeMonths}
+                  onChange={(e) => setChannelAgeMonths(Number(e.target.value))}
+                >
+                  <option value={1}>1ヶ月以内</option>
+                  <option value={2}>2ヶ月以内</option>
+                  <option value={3}>3ヶ月以内</option>
+                  <option value={4}>4ヶ月以内</option>
+                  <option value={5}>5ヶ月以内</option>
+                  <option value={6}>6ヶ月以内</option>
+                </select>
+              </div>
+              <div className="col-md-3 mb-3">
                 <label htmlFor="minSubscriberCount" className="form-label">最低登録者数</label>
                 <input
                   type="number"
@@ -226,7 +394,7 @@ function App() {
                   placeholder="例: 1000"
                 />
               </div>
-              <div className="col-md-6 mb-3">
+              <div className="col-md-3 mb-3">
                 <label htmlFor="minViewCount" className="form-label">最低総再生回数</label>
                 <input
                   type="number"
@@ -237,9 +405,24 @@ function App() {
                   placeholder="例: 10000"
                 />
               </div>
+              <div className="col-md-3 mb-3">
+                <label htmlFor="maxPagesPerTerm" className="form-label">検索ページ数 (1ページ=50件)</label>
+                <select
+                  className="form-control"
+                  id="maxPagesPerTerm"
+                  value={maxPagesPerTerm}
+                  onChange={(e) => setMaxPagesPerTerm(Number(e.target.value))}
+                >
+                  <option value={1}>1ページ (50件/キーワード)</option>
+                  <option value={2}>2ページ (100件/キーワード)</option>
+                  <option value={3}>3ページ (150件/キーワード)</option>
+                  <option value={4}>4ページ (200件/キーワード)</option>
+                  <option value={5}>5ページ (250件/キーワード)</option>
+                </select>
+              </div>
             </div>
             <button className="btn btn-success w-100" onClick={searchChannels}>
-              <i className="bi bi-search me-2"></i>直近3ヶ月で人気の音楽チャンネルを検索
+              <i className="bi bi-search me-2"></i>タグベースでチャンネルを検索・分析
             </button>
           </div>
         </div>
@@ -250,20 +433,43 @@ function App() {
           <h2 className="mb-4 text-center">検索ログ</h2>
           <ul className="list-group">
             {logs.map((log, index) => (
-              <li key={index} className="list-group-item d-flex justify-content-between align-items-center">
-                <div>
-                  <a href={`https://www.youtube.com/channel/${log.channel.id}`} target="_blank" rel="noopener noreferrer">
-                    {log.channel.title}
-                  </a>
-                  <small className="d-block text-muted">
-                    登録者数: {parseInt(log.channel.subscriberCount).toLocaleString()} / 総再生回数: {parseInt(log.channel.viewCount).toLocaleString()}
-                  </small>
+              <li key={index} className="list-group-item">
+                <div className="d-flex justify-content-between align-items-start">
+                  <div className="flex-grow-1">
+                    <div className="d-flex align-items-center mb-2">
+                      <a href={`https://www.youtube.com/channel/${log.channel.id}`} target="_blank" rel="noopener noreferrer" className="me-3">
+                        {log.channel.title}
+                      </a>
+                      <div className="d-flex gap-2">
+                        {log.meetsCriteria ? (
+                          <span className="badge bg-success">条件達成</span>
+                        ) : (
+                          <span className="badge bg-danger">条件未達</span>
+                        )}
+                        {log.hasMatchingTags ? (
+                          <span className="badge bg-primary">タグマッチ</span>
+                        ) : (
+                          <span className="badge bg-secondary">タグ不一致</span>
+                        )}
+                      </div>
+                    </div>
+                    <small className="d-block text-muted mb-2">
+                      登録者数: {parseInt(log.channel.subscriberCount).toLocaleString()} / 総再生回数: {parseInt(log.channel.viewCount).toLocaleString()}
+                    </small>
+                    {log.channel.channelKeywords && log.channel.channelKeywords.length > 0 && (
+                      <small className="d-block text-muted mb-1">
+                        <strong>チャンネルキーワード:</strong> {log.channel.channelKeywords.slice(0, 5).join(', ')}
+                        {log.channel.channelKeywords.length > 5 && '...'}
+                      </small>
+                    )}
+                    {log.channel.videoTags && log.channel.videoTags.length > 0 && (
+                      <small className="d-block text-muted">
+                        <strong>動画タグ:</strong> {log.channel.videoTags.slice(0, 5).join(', ')}
+                        {log.channel.videoTags.length > 5 && '...'}
+                      </small>
+                    )}
+                  </div>
                 </div>
-                {log.meetsCriteria ? (
-                  <i className="bi bi-check-circle-fill text-success fs-4"></i>
-                ) : (
-                  <i className="bi bi-x-circle-fill text-danger fs-4"></i>
-                )}
               </li>
             ))}
           </ul>
@@ -286,6 +492,31 @@ function App() {
                       <strong>動画数:</strong> {parseInt(channel.videoCount).toLocaleString()}本<br />
                       <strong>開設日:</strong> {new Date(channel.publishedAt).toLocaleDateString()}
                     </p>
+                    
+                    {channel.channelKeywords && channel.channelKeywords.length > 0 && (
+                      <div className="mb-2">
+                        <small className="text-muted">
+                          <strong>チャンネルキーワード:</strong><br />
+                          <span className="badge bg-light text-dark me-1 mb-1">
+                            {channel.channelKeywords.slice(0, 3).join(', ')}
+                            {channel.channelKeywords.length > 3 && '...'}
+                          </span>
+                        </small>
+                      </div>
+                    )}
+                    
+                    {channel.videoTags && channel.videoTags.length > 0 && (
+                      <div className="mb-2">
+                        <small className="text-muted">
+                          <strong>動画タグ:</strong><br />
+                          {channel.videoTags.slice(0, 3).map((tag, index) => (
+                            <span key={index} className="badge bg-secondary me-1 mb-1">{tag}</span>
+                          ))}
+                          {channel.videoTags.length > 3 && <span className="badge bg-secondary">+{channel.videoTags.length - 3}</span>}
+                        </small>
+                      </div>
+                    )}
+                    
                     <a href={`https://www.youtube.com/channel/${channel.id}`} target="_blank" rel="noopener noreferrer" className="btn btn-outline-primary btn-sm mt-auto">
                       YouTubeで見る
                     </a>
