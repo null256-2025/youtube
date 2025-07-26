@@ -61,6 +61,7 @@ function App() {
       return keywords ? keywords.split(',').map(k => k.trim().toLowerCase()) : [];
     } catch (error) {
       console.error('Error fetching channel keywords:', error);
+      // エラーが発生した場合は空配列を返して処理を継続
       return [];
     }
   };
@@ -105,6 +106,7 @@ function App() {
       return [...new Set(allTags)]; // 重複を除去
     } catch (error) {
       console.error('Error fetching video tags:', error);
+      // エラーが発生した場合は空配列を返して処理を継続
       return [];
     }
   };
@@ -145,7 +147,6 @@ function App() {
     try {
       const channelAgeDate = new Date();
       channelAgeDate.setMonth(channelAgeDate.getMonth() - channelAgeMonths);
-      const publishedAfter = channelAgeDate.toISOString();
 
       let allChannelIds = new Set();
 
@@ -160,7 +161,6 @@ function App() {
               type: 'video',
               part: 'snippet',
               maxResults: 50,
-              publishedAfter: publishedAfter,
               pageToken: nextPageToken,
             },
           });
@@ -212,9 +212,14 @@ function App() {
         processedCount++;
         setMessage(`分析中... (${processedCount}/${totalChannels})`);
 
-        // 基本的な条件チェック
+        // チャンネル開設日のチェック
+        const channelPublishedDate = new Date(channel.snippet.publishedAt);
+        const isChannelNewEnough = channelPublishedDate >= channelAgeDate;
+
+        // 基本的な条件チェック（チャンネル開設日を含む）
         const meetsBasicCriteria = parseInt(channel.statistics.subscriberCount) >= minSubscriberCount &&
-                                   parseInt(channel.statistics.viewCount) >= minViewCount;
+                                   parseInt(channel.statistics.viewCount) >= minViewCount &&
+                                   isChannelNewEnough;
 
         if (meetsBasicCriteria) {
           // チャンネルのキーワードと動画のタグを取得
@@ -296,10 +301,30 @@ function App() {
       if (error.response) {
         console.error('Error response:', error.response.data);
         
-        if (error.response.status === 403 && error.response.data.error?.errors?.[0]?.reason === 'quotaExceeded') {
-          setMessage('APIクォータ制限に達しました。Google Cloud ConsoleでAPIクォータを確認してください。');
+        if (error.response.status === 403) {
+          const errorReason = error.response.data.error?.errors?.[0]?.reason;
+          const errorMessage = error.response.data.error?.message || '';
+          
+          // メッセージ内容またはreasonでクォータ制限を判定
+          const isQuotaError = errorReason === 'quotaExceeded' ||
+                              errorMessage.toLowerCase().includes('quota') ||
+                              errorMessage.toLowerCase().includes('exceeded');
+          
+          if (isQuotaError) {
+            setMessage('APIクォータ制限に達しました。Google Cloud ConsoleでAPIクォータを確認してください。');
+          } else if (errorReason === 'forbidden' || errorMessage.toLowerCase().includes('forbidden')) {
+            setMessage('APIキーが無効です。正しいYouTube Data API v3キーを入力してください。');
+          } else if (errorReason === 'accessNotConfigured' || errorMessage.toLowerCase().includes('not configured')) {
+            setMessage('YouTube Data API v3が有効化されていません。Google Cloud ConsoleでAPIを有効化してください。');
+          } else {
+            setMessage(`APIアクセスエラーが発生しました: ${errorMessage || 'APIキーまたは権限を確認してください。'}`);
+          }
+        } else if (error.response.status === 400) {
+          const errorMessage = error.response.data.error?.message;
+          setMessage(`リクエストエラーが発生しました: ${errorMessage || '検索条件を確認してください。'}`);
         } else {
-          setMessage('チャンネルの検索中にエラーが発生しました。APIキーが正しいか、またはリクエスト制限に達していないか確認してください。');
+          const errorMessage = error.response.data.error?.message;
+          setMessage(`エラーが発生しました (${error.response.status}): ${errorMessage || 'APIキーまたはリクエスト内容を確認してください。'}`);
         }
       } else {
         setMessage('ネットワークエラーが発生しました。インターネット接続を確認してください。');
