@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { Link } from 'react-router-dom';
+import { CONTACT_INFO } from '../utils/constants';
 
 function AgreementModal({ onAgree }) {
   const [hasReadTerms, setHasReadTerms] = useState(false);
@@ -106,7 +107,7 @@ function AgreementModal({ onAgree }) {
             <div className="d-flex justify-content-between w-100">
               <small className="text-muted align-self-center">
                 <i className="bi bi-calendar me-1"></i>
-                最終更新: 2025年1月30日
+                最終更新: {CONTACT_INFO.LAST_UPDATED}
               </small>
               <button
                 type="button"

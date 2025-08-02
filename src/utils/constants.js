@@ -41,3 +41,9 @@ export const SUCCESS_MESSAGES = {
   API_KEY_SAVED: 'APIキーを保存しました！',
   DATA_CLEARED: 'すべてのデータを削除しました。ページを再読み込みします。',
 };
+
+// 連絡先情報
+export const CONTACT_INFO = {
+  EMAIL: 'null256.2025@gmail.com',
+  LAST_UPDATED: '2025年8月2日',
+};

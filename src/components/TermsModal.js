@@ -1,4 +1,5 @@
 import React from 'react';
+import { CONTACT_INFO } from '../utils/constants';
 
 const TermsModal = ({ show, onClose }) => {
   if (!show) return null;
@@ -12,7 +13,7 @@ const TermsModal = ({ show, onClose }) => {
             <button type="button" className="btn-close" onClick={onClose}></button>
           </div>
           <div className="modal-body">
-            <p className="text-muted mb-4">最終更新日: 2025年1月30日</p>
+            <p className="text-muted mb-4">最終更新日: {CONTACT_INFO.LAST_UPDATED}</p>
             
             <div className="card mb-4">
               <div className="card-body">
@@ -119,7 +120,7 @@ const TermsModal = ({ show, onClose }) => {
               <div className="card-body">
                 <h2 className="h4 mb-3">10. お問い合わせ</h2>
                 <p>本利用規約に関するお問い合わせは、以下までご連絡ください：</p>
-                <p><strong>連絡先：</strong> <a href="mailto:example@domain.com">example@domain.com</a></p>
+                <p><strong>連絡先：</strong> <a href={`mailto:${CONTACT_INFO.EMAIL}`}>{CONTACT_INFO.EMAIL}</a></p>
               </div>
             </div>
           </div>

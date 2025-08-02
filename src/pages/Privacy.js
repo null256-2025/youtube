@@ -1,6 +1,7 @@
 
 import React from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
+import { CONTACT_INFO } from '../utils/constants';
 
 function Privacy() {
   return (
@@ -8,7 +9,7 @@ function Privacy() {
       <div className="row justify-content-center">
         <div className="col-lg-8">
           <h1 className="mb-4">プライバシーポリシー</h1>
-          <p className="text-muted mb-4">最終更新日: 2025年1月30日</p>
+          <p className="text-muted mb-4">最終更新日: {CONTACT_INFO.LAST_UPDATED}</p>
           
           <div className="alert alert-info mb-4">
             <h5><i className="bi bi-shield-check me-2"></i>プライバシー保護への取り組み</h5>
@@ -172,7 +173,7 @@ function Privacy() {
               <div className="alert alert-light">
                 <p className="mb-2"><strong>連絡先情報：</strong></p>
                 <ul className="mb-0">
-                  <li><strong>メールアドレス：</strong> <a href="mailto:example@domain.com">example@domain.com</a></li>
+                  <li><strong>メールアドレス：</strong> <a href={`mailto:${CONTACT_INFO.EMAIL}`}>{CONTACT_INFO.EMAIL}</a></li>
                   <li><strong>対応時間：</strong> 平日 9:00-18:00（土日祝日を除く）</li>
                   <li><strong>回答期間：</strong> 原則として7営業日以内</li>
                 </ul>
