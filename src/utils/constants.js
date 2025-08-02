@@ -5,16 +5,17 @@ export const API_ENDPOINTS = {
   YOUTUBE_VIDEOS: 'https://www.googleapis.com/youtube/v3/videos',
 };
 
-// デフォルト値
+// デフォルト値（最適化版）
 export const DEFAULT_VALUES = {
   MIN_SUBSCRIBER_COUNT: 1000,
   MIN_VIEW_COUNT: 10000,
-  MAX_PAGES_PER_TERM: 4,
+  MAX_PAGES_PER_TERM: 2, // 4から2に削減
   CHANNEL_AGE_MONTHS: 3,
   MAX_SEARCH_TERMS: 3,
   CHUNK_SIZE: 50,
-  MAX_RESULTS: 50,
-  VIDEO_SAMPLE_SIZE: 10,
+  MAX_RESULTS: 25, // 50から25に削減
+  VIDEO_SAMPLE_SIZE: 5, // 10から5に削減
+  MAX_DETAILED_ANALYSIS: 20, // 詳細分析する最大チャンネル数
 };
 
 // ローカルストレージのキー
